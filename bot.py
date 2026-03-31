@@ -1,53 +1,57 @@
 import os
-import asyncio
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import yt_dlp
+from telegram import Update
+from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 
-def search_youtube(query):
+def search_youtube(query, download=False):
     ydl_opts = {
         "format": "bestaudio/best",
         "quiet": True,
         "noplaylist": True,
         "default_search": "ytsearch1",
+        "outtmpl": "/tmp/%(title)s.%(ext)s",
     }
+    if download:
+        ydl_opts["postprocessors"] = [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "192",
+        }]
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(query, download=False)
+        info = ydl.extract_info(query, download=download)
         if "entries" in info:
             info = info["entries"][0]
-        return info["webpage_url"]
+        if download:
+            return f"/tmp/{info['title']}.mp3", info['title']
+        return info["webpage_url"], info['title']
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "🎵 مرحباً! أنا بوت الموسيقى\n"
-        "/play اسم الأغنية — للبحث عن رابط\n"
-        "/help — المساعدة"
-    )
-
-async def play(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        await update.message.reply_text("❗ مثال: /play فيروز")
-        return
-    query = " ".join(context.args)
-    msg = await update.message.reply_text(f"🔍 جاري البحث عن: {query}...")
-    try:
-        url = search_youtube(query)
-        await msg.edit_text(f"🎵 وجدت الأغنية:\n{url}")
-    except Exception as e:
-        await msg.edit_text(f"❌ خطأ: {str(e)}")
-
-async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "📖 اكتب /play واسم الأغنية\n"
-        "مثال: /play ام كلثوم"
-    )
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+    if text.startswith("شغل "):
+        query = text[4:].strip()
+        msg = await update.message.reply_text(f"🔍 جاري البحث عن: {query}...")
+        try:
+            url, title = search_youtube(query)
+            await msg.edit_text(f"🎵 {title}\n\n{url}")
+        except Exception as e:
+            await msg.edit_text(f"❌ خطأ: {str(e)}")
+    elif text.startswith("يوت "):
+        query = text[4:].strip()
+        msg = await update.message.reply_text(f"⬇️ جاري تحميل: {query}...")
+        try:
+            filepath, title = search_youtube(query, download=True)
+            await msg.edit_text(f"📤 جاري الإرسال: {title}")
+            with open(filepath, "rb") as f:
+                await update.message.reply_audio(audio=f, title=title)
+            await msg.delete()
+            os.remove(filepath)
+        except Exception as e:
+            await msg.edit_text(f"❌ خطأ: {str(e)}")
 
 if __name__ == "__main__":
     application = ApplicationBuilder().token(BOT_TOKEN).build()
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("play", play))
-    application.add_handler(CommandHandler("help", help_cmd))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     print("✅ البوت يعمل!")
     application.run_polling()
