@@ -1,6 +1,5 @@
 python-telegram-bot==20.7
 yt-dlp
-py-tgcalls
+tgcalls
 pyrogram==2.0.106
 PyNaCl
-ffmpeg-python
