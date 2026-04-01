@@ -13,7 +13,7 @@ def search_youtube(query, download=False):
         "quiet": True,
         "noplaylist": True,
         "default_search": "ytsearch1",
-        "outtmpl": "/tmp/%(title)s.%(ext)s",
+        "outtmpl": "/tmp/%(id)s.%(ext)s",
         "ffmpeg_location": ffmpeg_path,
     }
     if download:
@@ -27,7 +27,7 @@ def search_youtube(query, download=False):
         if "entries" in info:
             info = info["entries"][0]
         if download:
-            return f"/tmp/{info['title']}.mp3", info['title']
+            return f"/tmp/{info['id']}.mp3", info['title']
         return info["webpage_url"], info['title']
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
