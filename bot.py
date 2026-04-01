@@ -1,17 +1,20 @@
 import os
 import yt_dlp
+import imageio_ffmpeg
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 
 def search_youtube(query, download=False):
+    ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
     ydl_opts = {
         "format": "bestaudio/best",
         "quiet": True,
         "noplaylist": True,
         "default_search": "ytsearch1",
         "outtmpl": "/tmp/%(title)s.%(ext)s",
+        "ffmpeg_location": ffmpeg_path,
     }
     if download:
         ydl_opts["postprocessors"] = [{
